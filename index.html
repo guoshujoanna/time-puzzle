@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>时间拼图 · 自适应日程</title>
+<style>
+  :root{
+    --bg:#EAE0D3; --paper:#FFFFFF; --paper-alt:#F5F0E7; --line:#EDE6D9;
+    --ink:#221E1A; --ink-soft:#928576;
+    --a:#A9C3E0; --b:#E8CE86; --c:#D99483; --d:#8FA179; --e:#B4BFE0; --f:#C97F5C;
+    --temp:#C9C0AE; --danger:#C1584A; --ok:#8FA179;
+    --radius:22px;
+    --shadow:0 6px 20px rgba(34,30,26,.06);
+    --shadow-sm:0 3px 10px rgba(34,30,26,.14);
+    --font-sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue","Microsoft YaHei","Heiti SC",Arial,sans-serif;
+    --font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Cascadia Mono",monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-sans);-webkit-font-smoothing:antialiased;padding:22px 16px 104px;}
+  .wrap{max-width:780px;margin:0 auto;}
+
+  header{padding:4px 2px 22px;}
+  .hero{display:flex;align-items:center;gap:9px;}
+  .hero .mark{width:22px;height:22px;flex-shrink:0;}
+  .hero .en{font-weight:900;font-size:22px;letter-spacing:-.02em;color:var(--ink);}
+  .hero .cn{font-size:13px;color:var(--ink-soft);font-weight:500;}
+  .sub{font-size:22px;font-weight:400;line-height:1.35;color:var(--ink);margin-top:14px;max-width:520px;}
+  .sub b{font-weight:800;}
+  .date-line{font-family:var(--font-mono);font-size:11.5px;color:var(--ink-soft);margin-top:10px;letter-spacing:.3px;}
+
+  /* bottom pill tab bar */
+  .tabs{
+    position:fixed;bottom:16px;left:50%;transform:translateX(-50%);
+    width:calc(100% - 28px);max-width:752px;
+    display:flex;justify-content:space-around;gap:2px;
+    background:var(--ink);border-radius:20px;
+    padding:8px 4px;z-index:50;box-shadow:0 10px 26px rgba(34,30,26,.28);
+  }
+  .tab-btn{
+    flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
+    border:none;background:transparent;padding:6px 2px;border-radius:14px;
+    font-size:10px;font-weight:600;color:#B8AF9E;cursor:pointer;font-family:var(--font-sans);
+  }
+  .tab-btn .icon{font-size:17px;line-height:1;}
+  .tab-btn.active{color:var(--ink);background:#FFFFFF;}
+  .tab-btn:focus-visible{outline:2px solid var(--e);}
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  .card{position:relative;background:var(--paper);border-radius:var(--radius);padding:20px 18px;margin-bottom:14px;box-shadow:var(--shadow);}
+  .card h2{font-weight:800;font-size:15px;margin:0 0 14px;letter-spacing:-.01em;
+    display:flex;align-items:center;gap:8px;color:var(--ink);}
+  .card h2 .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+  .field-label{font-size:11px;color:var(--ink-soft);display:block;margin-bottom:4px;font-weight:500;}
+
+  /* check-in row */
+  .checkin-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+  .checkin-grid .full{grid-column:1/-1;}
+  select,input[type=text],input[type=number],input[type=time]{
+    width:100%;border:none;border-radius:13px;padding:10px 11px;font-size:13px;
+    background:var(--paper-alt);color:var(--ink);font-family:var(--font-sans);font-weight:500;
+  }
+  select:focus-visible,input:focus-visible{outline:2px solid var(--e);}
+  .meal-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;}
+  .meal-item{text-align:center;}
+  .meal-item .field-label{margin-bottom:6px;}
+
+  .btn{
+    border:none;border-radius:100px;padding:12px 18px;font-size:13px;font-weight:700;cursor:pointer;
+    font-family:var(--font-sans);
+  }
+  .btn-primary{background:var(--ink);color:#fff;width:100%;box-shadow:var(--shadow-sm);}
+  .btn-primary:hover{background:#3A332C;}
+  .btn-secondary{background:var(--paper-alt);border:none;color:var(--ink);}
+  .btn-secondary:hover{color:#5F7A54;}
+
+  .suggestion{
+    background:var(--paper-alt);border-radius:16px;padding:13px 15px;
+    font-size:13px;line-height:1.7;color:var(--ink);margin-top:4px;
+  }
+  .suggestion.warn{background:#F2E0D9;color:var(--danger);}
+
+  /* timeline (signature element) */
+  .bar{display:flex;height:40px;border-radius:100px;overflow:hidden;background:var(--paper-alt);}
+  .seg{height:100%;display:flex;align-items:center;justify-content:center;color:var(--ink);font-size:10.5px;font-weight:700;overflow:hidden;
+    white-space:nowrap;text-overflow:ellipsis;padding:0 6px;transition:flex-basis .25s ease;}
+  .seg.free{background:transparent;color:var(--ink-soft);font-weight:600;}
+  .seg.over{background:var(--danger);color:#fff;}
+  .ticks{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:10px;color:var(--ink-soft);margin-top:8px;}
+
+  .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:16px 0 4px;}
+  .stat{background:var(--paper-alt);border-radius:16px;padding:12px 8px;text-align:center;}
+  .stat b{display:block;font-family:var(--font-mono);font-size:17px;font-weight:700;}
+  .stat span{font-size:10.5px;color:var(--ink-soft);}
+  .stat.neg b{color:var(--danger);}
+
+  /* task rows */
+  .task-list{display:flex;flex-direction:column;gap:8px;}
+  .task{background:var(--paper-alt);border-radius:16px;padding:11px 13px;display:flex;align-items:center;gap:9px;flex-wrap:wrap;}
+  .task.done{opacity:.5;}
+  .swatch{width:11px;height:11px;border-radius:50%;flex-shrink:0;}
+  .t-name{flex:1;min-width:110px;font-size:13.5px;font-weight:500;}
+  .t-name small{display:block;font-size:11px;color:var(--ink-soft);font-weight:400;}
+  .t-meta{display:flex;gap:6px;align-items:center;font-family:var(--font-mono);font-size:11.5px;color:var(--ink-soft);}
+  .badge{font-size:10px;padding:3px 8px;border-radius:100px;font-family:var(--font-sans);font-weight:700;}
+  .badge.high{background:#F0D5CD;color:var(--danger);}
+  .badge.mid{background:#F1E3C0;color:#8A6A22;}
+  .badge.low{background:#DEE7D5;color:#5F7A54;}
+  .actual-in{width:56px;font-family:var(--font-mono);font-size:11.5px;padding:5px 6px;background:var(--paper);border-radius:9px;}
+  input[type=checkbox]{width:17px;height:17px;accent-color:var(--d);cursor:pointer;flex-shrink:0;}
+  .del{border:none;background:transparent;color:var(--ink-soft);cursor:pointer;font-size:15px;padding:2px 4px;}
+  .del:hover{color:var(--danger);}
+  .empty{font-size:12px;color:var(--ink-soft);padding:6px 2px;}
+
+  /* habit editor rows */
+  .habit-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:11px 0;box-shadow:inset 0 -1px 0 var(--line);}
+  .habit-row:last-child{box-shadow:none;}
+  .habit-row .habit-name{flex:1 1 160px;}
+  .habit-name{font-size:13.5px;font-weight:500;display:flex;align-items:center;gap:8px;}
+  .habit-name small{color:var(--ink-soft);font-weight:400;}
+  .num-field{display:flex;align-items:center;gap:6px;}
+  .num-field label{font-size:10.5px;color:var(--ink-soft);width:34px;}
+
+  .form-row{display:flex;flex-direction:column;gap:8px;}
+  .form-row .two{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .form-row .three{display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;}
+
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;box-shadow:inset 0 -1px 0 var(--line);}
+  .toggle-row:last-child{box-shadow:none;}
+  .toggle-row .desc{font-size:11px;color:var(--ink-soft);margin-top:2px;}
+  .switch{position:relative;width:40px;height:22px;flex-shrink:0;}
+  .switch input{opacity:0;width:0;height:0;}
+  .slider{position:absolute;inset:0;background:var(--line);border-radius:22px;cursor:pointer;transition:.2s;}
+  .slider:before{content:"";position:absolute;width:16px;height:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;}
+  input:checked + .slider{background:var(--d);}
+  input:checked + .slider:before{transform:translateX(18px);}
+
+  .week-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;box-shadow:inset 0 -1px 0 var(--line);font-size:13px;}
+  .week-row:last-child{box-shadow:none;}
+  .week-row b{font-family:var(--font-mono);}
+  .note{font-size:12px;color:var(--ink-soft);margin-top:8px;line-height:1.6;}
+
+  footer{margin-top:26px;font-size:11px;color:var(--ink-soft);text-align:center;}
+
+  @media(max-width:480px){
+    .summary{grid-template-columns:repeat(2,1fr);}
+    .checkin-grid{grid-template-columns:1fr;}
+    .meal-row{grid-template-columns:1fr;}
+    .habit-row{grid-template-columns:1fr;}
+    .form-row .three{grid-template-columns:1fr;}
+    .form-row .two{grid-template-columns:1fr;}
+    .sub{font-size:19px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="hero">
+      <svg class="mark" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="8" height="8" rx="2" fill="var(--d)"/><rect x="14" y="2" width="8" height="8" rx="2" fill="var(--e)"/><rect x="2" y="14" width="8" height="8" rx="2" fill="var(--b)"/><rect x="14" y="14" width="8" height="8" rx="2" fill="var(--f)"/></svg>
+      <span class="en">Time Puzzle</span>
+      <span class="cn">时间拼图</span>
+    </div>
+    <div class="sub">今天想把时间<b>花在哪</b>，先花 10 秒安排一下。</div>
+    <div class="date-line" id="dateLine"></div>
+  </header>
+
+  <div class="tabs" id="tabs">
+    <button class="tab-btn active" data-tab="today"><span class="icon">🏠</span>今天</button>
+    <button class="tab-btn" data-tab="add"><span class="icon">✏️</span>添加</button>
+    <button class="tab-btn" data-tab="habits"><span class="icon">🧭</span>习惯</button>
+    <button class="tab-btn" data-tab="week"><span class="icon">📅</span>回顾</button>
+    <button class="tab-btn" data-tab="settings"><span class="icon">🎒</span>设置</button>
+    <button class="tab-btn" data-tab="ai"><span class="icon">🤖</span>问AI</button>
+  </div>
+
+  <!-- 今天 -->
+  <div class="panel active" id="panel-today">
+
+    <div class="card">
+      <h2><span class="dot" style="background:var(--f)"></span>今日签到</h2>
+      <div class="checkin-grid">
+        <div>
+          <span class="field-label">今天几点起床</span>
+          <input type="time" id="wakeInput">
+        </div>
+        <div>
+          <span class="field-label">今天的精力 / 模式</span>
+          <select id="modeInput">
+            <option value="normal">正常模式 — 完成全部固定任务</option>
+            <option value="busy">忙碌模式 — 保留求职/睡眠/最重要学习</option>
+            <option value="low">低能量模式 — 任务缩短，保留最小行动</option>
+          </select>
+        </div>
+      </div>
+      <span class="field-label">三餐安排</span>
+      <div class="meal-row">
+        <div class="meal-item">
+          <span class="field-label">早餐</span>
+          <select id="meal-breakfast"><option value="cook">自己做</option><option value="delivery">点外卖</option></select>
+        </div>
+        <div class="meal-item">
+          <span class="field-label">午餐</span>
+          <select id="meal-lunch"><option value="cook">自己做</option><option value="delivery">点外卖</option></select>
+        </div>
+        <div class="meal-item">
+          <span class="field-label">晚餐</span>
+          <select id="meal-dinner"><option value="cook">自己做</option><option value="delivery">点外卖</option></select>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="rescheduleBtn">🔄 重新安排今天</button>
+      <div class="suggestion" id="suggestionBox" style="display:none;"></div>
+    </div>
+
+    <div class="card">
+      <h2><span class="dot" style="background:var(--a)"></span>今日时间轴</h2>
+      <div class="bar" id="bar"></div>
+      <div class="ticks" id="ticks"></div>
+      <div class="summary" id="summary"></div>
+    </div>
+
+    <div class="card">
+      <h2><span class="dot" style="background:var(--d)"></span>今日安排</h2>
+      <div class="task-list" id="scheduleList"></div>
+      <div class="note" id="skippedNote" style="display:none;"></div>
+      <div class="form-row" style="margin-top:10px;">
+        <div class="three" style="grid-template-columns:2fr 1fr auto;">
+          <input type="text" id="extraName" placeholder="今天临时加一项，例如「整理简历附件」">
+          <input type="number" id="extraMin" value="20" min="0" step="5">
+          <button class="btn btn-secondary" id="addExtraBtn">+ 添加</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="dot" style="background:var(--temp)"></span>临时任务</h2>
+      <div class="task-list" id="tempList"></div>
+    </div>
+  </div>
+
+  <!-- 添加任务 -->
+  <div class="panel" id="panel-add">
+    <div class="card">
+      <h2><span class="dot" style="background:var(--temp)"></span>添加临时任务</h2>
+      <div class="form-row">
+        <div>
+          <span class="field-label">任务内容</span>
+          <input type="text" id="taskName" placeholder="例如「取快递」「和中介打电话」">
+        </div>
+        <div class="three">
+          <div>
+            <span class="field-label">预计耗时（分钟）</span>
+            <input type="number" id="taskMin" value="30" min="0" step="5">
+          </div>
+          <div>
+            <span class="field-label">截止时间（可选）</span>
+            <input type="time" id="taskDeadline">
+          </div>
+          <div>
+            <span class="field-label">重要程度</span>
+            <select id="taskPriority">
+              <option value="high">高</option>
+              <option value="mid" selected>中</option>
+              <option value="low">低</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-primary" id="addTaskBtn">添加到今天</button>
+      </div>
+      <p class="note">添加后可以切换到「今天」标签，点击「重新安排今天」，系统会根据这条新任务自动压缩游戏、题库、单词等弹性时间。</p>
+    </div>
+  </div>
+
+  <!-- 固定习惯 -->
+  <div class="panel" id="panel-habits">
+    <div class="card">
+      <h2><span class="dot" style="background:var(--d)"></span>固定习惯目标时长</h2>
+      <p class="note" style="margin-top:-4px;">「正常」是正常模式下使用的时长，「最低」是忙碌 / 低能量模式下会压缩到的下限。勾选「受保护」的习惯会最后才被压缩。</p>
+      <p class="note" id="protectedNote" style="margin-top:2px;"></p>
+      <div id="habitEditor"></div>
+    </div>
+  </div>
+
+  <!-- 本周回顾 -->
+  <div class="panel" id="panel-week">
+    <div class="card">
+      <h2><span class="dot" style="background:var(--e)"></span>本周回顾（近 7 天）</h2>
+      <div id="weekStats"></div>
+      <div class="note" id="weekNote"></div>
+    </div>
+  </div>
+
+  <!-- 设置 -->
+  <div class="panel" id="panel-settings">
+    <div class="card">
+      <h2><span class="dot" style="background:var(--a)"></span>作息与生活</h2>
+      <div class="checkin-grid">
+        <div>
+          <span class="field-label">默认起床时间</span>
+          <input type="time" id="defWake">
+        </div>
+        <div>
+          <span class="field-label">默认入睡时间</span>
+          <input type="time" id="defSleep">
+        </div>
+        <div>
+          <span class="field-label">起床后刷手机 · 正常时长（分钟）</span>
+          <input type="number" id="wakeDyTarget" min="0" step="5">
+        </div>
+        <div>
+          <span class="field-label">起床后刷手机 · 最低时长（分钟）</span>
+          <input type="number" id="wakeDyMin" min="0" step="5">
+        </div>
+        <div>
+          <span class="field-label">自己做饭一餐耗时（分钟）</span>
+          <input type="number" id="cookMin" min="0" step="5">
+        </div>
+        <div>
+          <span class="field-label">点外卖一餐耗时（分钟）</span>
+          <input type="number" id="deliveryMin" min="0" step="5">
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h2><span class="dot" style="background:var(--c)"></span>保护选项</h2>
+      <div class="toggle-row">
+        <div>
+          <div>保护游戏时间</div>
+          <div class="desc">开启后，游戏时长不会被自动重排压缩（求职仍然优先）</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="protectGame"><span class="slider"></span></label>
+      </div>
+    </div>
+    <div class="card">
+      <h2><span class="dot" style="background:var(--e)"></span>问AI · API Key</h2>
+      <p class="note" style="margin-top:-6px;">在 platform.deepseek.com 申请自己的密钥后粘贴到这里。密钥只存在你自己的浏览器里，不会传给任何人，也不会随这个文件被分享出去。</p>
+      <span class="field-label">DeepSeek API Key</span>
+      <input type="password" id="deepseekKey" placeholder="sk-...">
+    </div>
+  </div>
+
+  <!-- 问AI -->
+  <div class="panel" id="panel-ai">
+    <div class="card">
+      <h2><span class="dot" style="background:var(--e)"></span>跟AI说说今天</h2>
+      <p class="note" style="margin-top:-6px;">把今天要做的事随便写一段，AI会帮你拆成任务，加上预计耗时、截止时间和重要程度，你可以挑着加进今天的安排。</p>
+      <textarea id="aiInput" placeholder="例如：下午两点要跟中介看房，大概一小时；晚上朋友约我吃饭，可能要两个多小时；还要记得交房租，今天必须办完" style="width:100%;min-height:96px;border:none;border-radius:13px;padding:11px 12px;font-size:13px;background:var(--paper-alt);color:var(--ink);font-family:var(--font-sans);resize:vertical;"></textarea>
+      <button class="btn btn-primary" id="aiGoBtn" style="margin-top:10px;">帮我拆解今天</button>
+      <div id="aiStatus" class="note" style="display:none;"></div>
+    </div>
+    <div class="card" id="aiResultCard" style="display:none;">
+      <h2><span class="dot" style="background:var(--d)"></span>AI的拆解结果</h2>
+      <div class="suggestion" id="aiSummary" style="display:none;"></div>
+      <div class="task-list" id="aiTaskList" style="margin-top:10px;"></div>
+      <button class="btn btn-secondary" id="aiAddAllBtn" style="margin-top:10px;width:100%;">全部添加到今天</button>
+    </div>
+  </div>
+
+  <footer>数据保存在你的账户中，长期习惯设置会保留，每日安排各自独立记录</footer>
+</div>
+
+<script>
+const COLOR = {a:'--a',b:'--b',c:'--c',d:'--d',e:'--e',f:'--f'};
+function colorVar(key){ return key==='temp' ? 'var(--temp)' : `var(${COLOR[key]||'--a'})`; }
+
+/* ---------- helpers ---------- */
+function pad(n){return String(n).padStart(2,'0');}
+function todayKey(d=new Date()){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
+function keyForOffset(offset){const d=new Date();d.setDate(d.getDate()-offset);return todayKey(d);}
+function fmtDateLine(){const d=new Date();const wd=['周日','周一','周二','周三','周四','周五','周六'][d.getDay()];return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日 · ${wd}`;}
+function minToHM(min){min=Math.max(0,Math.round(min));const h=Math.floor(min/60),m=min%60;if(h===0)return `${m}分`;if(m===0)return `${h}小时`;return `${h}小时${m}分`;}
+function timeToMin(str){if(!str)return null;const [h,m]=str.split(':').map(Number);if(isNaN(h)||isNaN(m))return null;return h*60+m;}
+function minToClock(min){return `${pad(Math.floor(min/60))}:${pad(min%60)}`;}
+function uid(){return Math.random().toString(36).slice(2,9);}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+const DEFAULT_HABITS = [
+  {id:'jobhunt', name:'投简历 / 找工作', color:'d', protected:true,  skippable:false, target:120, min:90},
+  {id:'examdb',  name:'刷北林题库',      color:'e', protected:false, skippable:true,  target:60,  min:30},
+  {id:'english', name:'背英语单词',      color:'e', protected:false, skippable:false, target:30,  min:20},
+  {id:'fitness', name:'健身',           color:'f', protected:false, skippable:true,  target:90,  min:30},
+  {id:'gaming',  name:'游戏时间',        color:'c', protected:false, skippable:false, target:105, min:45},
+];
+const MEAL_ORDER = ['breakfast','lunch','dinner'];
+const MEAL_LABEL = {breakfast:'早餐',lunch:'午餐',dinner:'晚餐'};
+const PRIORITY_LABEL = {high:'高',mid:'中',low:'低'};
+
+function idToLabel(id){
+  const map = {wake_dy:'起床后刷手机', breakfast:'早餐', lunch:'午餐', dinner:'晚餐'};
+  if(map[id]) return map[id];
+  const h = habits.find(x=>x.id===id);
+  if(h) return h.name;
+  const ex = ((day && day.extra) || []).find(x=>x.id===id);
+  return ex ? ex.name : id;
+}
+
+/* ---------- state ---------- */
+let habits = JSON.parse(JSON.stringify(DEFAULT_HABITS));
+let general = {wake:'07:30', sleep:'22:30', wakeDyTarget:30, wakeDyMin:10, cookMin:90, deliveryMin:40, protectGame:false, deepseekKey:''};
+let day = null; // today's data
+let lastPlan = null;
+
+/* ---------- storage (plain browser localStorage — works standalone, no platform dependency) ---------- */
+async function loadJSON(key, fallback){
+  try{ const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; }
+  catch(e){ return fallback; }
+}
+async function saveJSON(key, obj){
+  try{ localStorage.setItem(key, JSON.stringify(obj)); }catch(e){}
+}
+function defaultDay(){
+  return {
+    mode:'normal',
+    meals:{breakfast:'cook', lunch:'cook', dinner:'cook'},
+    checked:{}, // habitId/daily id -> {done:bool, actual:number}
+    temp:[],    // {id,name,minutes,deadline,priority,done,actual}
+    extra:[],   // {id,name,minutes} — one-off items added straight into today's schedule
+    skipped:[], // ids of habits/meals/daily items skipped just for today
+    lastMessage:'',
+  };
+}
+
+async function loadAll(){
+  habits = await loadJSON('planner:habits', JSON.parse(JSON.stringify(DEFAULT_HABITS)));
+  general = await loadJSON('planner:general', general);
+  day = await loadJSON('planner:day:'+todayKey(), defaultDay());
+  day.extra = day.extra || [];
+  day.skipped = day.skipped || [];
+
+  document.getElementById('wakeInput').value = day.wake || general.wake;
+  document.getElementById('modeInput').value = day.mode;
+  MEAL_ORDER.forEach(m=>document.getElementById('meal-'+m).value = day.meals[m]);
+
+  document.getElementById('defWake').value = general.wake;
+  document.getElementById('defSleep').value = general.sleep;
+  document.getElementById('wakeDyTarget').value = general.wakeDyTarget;
+  document.getElementById('wakeDyMin').value = general.wakeDyMin;
+  document.getElementById('cookMin').value = general.cookMin;
+  document.getElementById('deliveryMin').value = general.deliveryMin;
+  document.getElementById('protectGame').checked = !!general.protectGame;
+  document.getElementById('deepseekKey').value = general.deepseekKey || '';
+}
+
+async function saveDay(){ await saveJSON('planner:day:'+todayKey(), day); }
+async function saveHabits(){ await saveJSON('planner:habits', habits); }
+async function saveGeneral(){ await saveJSON('planner:general', general); }
+
+/* ---------- scheduling engine ---------- */
+function computeAvailable(){
+  const wake = timeToMin(document.getElementById('wakeInput').value) ?? timeToMin(general.wake);
+  const sleep = timeToMin(general.sleep);
+  return {wake, sleep, available: Math.max(sleep-wake,0)};
+}
+
+function baselinePlan(mode){
+  const plan = {daily:{}, habit:{}, meals:{}};
+  plan.daily.wake_dy = mode==='normal' ? general.wakeDyTarget : general.wakeDyMin;
+  habits.forEach(h=>{
+    if(h.id==='gaming' && general.protectGame) plan.habit[h.id] = h.target;
+    else plan.habit[h.id] = mode==='normal' ? h.target : h.min;
+  });
+  MEAL_ORDER.forEach(m=>{ plan.meals[m] = day.meals[m]; });
+  return plan;
+}
+
+function mealMinutes(type){ return type==='cook' ? general.cookMin : general.deliveryMin; }
+
+function planTotal(plan){
+  return scheduleItemsFromPlan(plan).reduce((s,i)=>s+i.minutes,0);
+}
+
+function runReschedule(){
+  const {available} = computeAvailable();
+  const mode = document.getElementById('modeInput').value;
+  MEAL_ORDER.forEach(m=>{ day.meals[m] = document.getElementById('meal-'+m).value; });
+
+  const plan = baselinePlan(mode);
+  const tempTotal = day.temp.filter(t=>!t.done).reduce((s,t)=>s+Number(t.minutes||0),0);
+
+  let free = available - planTotal(plan) - tempTotal;
+  const log = [];
+
+  const candidates = [];
+  ['dinner','lunch','breakfast'].forEach(m=>{
+    candidates.push(()=>{
+      if(plan.meals[m]==='cook'){
+        const saved = general.cookMin - general.deliveryMin;
+        if(saved<=0) return null;
+        plan.meals[m]='delivery';
+        return {saved, msg:`${MEAL_LABEL[m]}点外卖，节省${saved}分钟`};
+      }
+      return null;
+    });
+  });
+  // 非保护习惯：先压缩到各自的「最低时长」（受保护游戏时间时跳过游戏）
+  habits.forEach(h=>{
+    candidates.push(()=>{
+      if(h.protected) return null;
+      if(h.id==='gaming' && general.protectGame) return null;
+      if(plan.habit[h.id] > h.min){
+        const old = plan.habit[h.id]; plan.habit[h.id] = h.min;
+        return {saved: old-plan.habit[h.id], msg:`${h.name}调整为${minToHM(plan.habit[h.id])}`};
+      }
+      return null;
+    });
+  });
+  // 仍不够：可跳过的非保护习惯，进一步压缩到 0
+  habits.forEach(h=>{
+    candidates.push(()=>{
+      if(h.protected || h.skippable===false) return null;
+      if(h.id==='gaming' && general.protectGame) return null;
+      if(plan.habit[h.id] > 0){
+        const old = plan.habit[h.id]; plan.habit[h.id] = 0;
+        return {saved: old, msg:`${h.name}今天可以跳过`};
+      }
+      return null;
+    });
+  });
+  candidates.push(()=>{
+    if(plan.daily.wake_dy > 0){
+      const old = plan.daily.wake_dy; plan.daily.wake_dy = 0;
+      return {saved: old, msg:`刷手机时间压缩到 0`};
+    } return null;
+  });
+  // 受保护的习惯（如求职）最后才动：先压到最低时长
+  habits.forEach(h=>{
+    candidates.push(()=>{
+      if(!h.protected) return null;
+      if(plan.habit[h.id] > h.min){
+        const old = plan.habit[h.id]; plan.habit[h.id] = h.min;
+        return {saved: old-plan.habit[h.id], msg:`${h.name}调整为${minToHM(plan.habit[h.id])}`};
+      }
+      return null;
+    });
+  });
+  // 万不得已：受保护习惯压到硬底线
+  habits.forEach(h=>{
+    candidates.push(()=>{
+      if(!h.protected) return null;
+      const floor = Math.min(h.min, 45);
+      if(plan.habit[h.id] > floor){
+        const old = plan.habit[h.id]; plan.habit[h.id] = floor;
+        return {saved: old-plan.habit[h.id], msg:`${h.name}不得不压缩到${minToHM(plan.habit[h.id])}，建议尽快补上`};
+      }
+      return null;
+    });
+  });
+
+  for(const fn of candidates){
+    if(free>=0) break;
+    const r = fn();
+    if(r){ free += r.saved; log.push(r.msg); }
+  }
+
+  let message;
+  const prefix = tempTotal>0 ? `今天有 ${day.temp.filter(t=>!t.done).length} 项临时任务，共 ${minToHM(tempTotal)}。` : '';
+  if(free>=0 && log.length===0){
+    message = prefix + (tempTotal>0 ? '时间够用，按调整后的安排进行就好。' : '今天时间充足，按计划进行就好。');
+  }else if(free>=0){
+    message = prefix + '建议：' + log.join('；') + '。睡眠时间不变。';
+  }else{
+    message = prefix + (log.length? '建议：' + log.join('；') + '。' : '') + `即便压缩到最低配置，仍超出 ${minToHM(-free)}，建议减少临时任务或推迟部分安排。`;
+  }
+
+  day.mode = mode;
+  lastPlan = {plan, free, available, tempTotal};
+  day.lastMessage = message;
+  return {plan, free, message, available, tempTotal};
+}
+
+/* ---------- rendering ---------- */
+function scheduleItemsFromPlan(plan){
+  const skipped = (day && day.skipped) || [];
+  const items = [];
+  const add = (id, name, minutes, color, kind)=>{
+    if(skipped.includes(id)) return;
+    items.push({id, name, minutes, color, kind});
+  };
+  add('wake_dy', '起床后刷手机', plan.daily.wake_dy, 'a', 'daily');
+  add('breakfast', `早餐（${plan.meals.breakfast==='cook'?'自己做':'点外卖'}）`, mealMinutes(plan.meals.breakfast), 'b', 'meal');
+  add('lunch', `午餐（${plan.meals.lunch==='cook'?'自己做':'点外卖'}）`, mealMinutes(plan.meals.lunch), 'b', 'meal');
+  habits.forEach(h=> add(h.id, h.name, plan.habit[h.id], h.color, 'habit'));
+  add('dinner', `晚餐（${plan.meals.dinner==='cook'?'自己做':'点外卖'}）`, mealMinutes(plan.meals.dinner), 'b', 'meal');
+  ((day && day.extra) || []).forEach(x=>{
+    items.push({id:x.id, name:x.name, minutes:x.minutes, color:'temp', kind:'extra'});
+  });
+  return items;
+}
+
+function currentPlan(){
+  if(lastPlan) return lastPlan;
+  const mode = day.mode || 'normal';
+  const plan = baselinePlan(mode);
+  const {available} = computeAvailable();
+  const tempTotal = day.temp.filter(t=>!t.done).reduce((s,t)=>s+Number(t.minutes||0),0);
+  const free = available - planTotal(plan) - tempTotal;
+  return {plan, free, available, tempTotal};
+}
+
+function renderToday(){
+  document.getElementById('dateLine').textContent = fmtDateLine();
+  const {plan, free, available} = currentPlan();
+  const items = scheduleItemsFromPlan(plan);
+  const fixedTotal = items.reduce((s,i)=>s+i.minutes,0);
+
+  renderBar(items, available, free);
+  renderSummary(items, available, free);
+  renderScheduleList(items);
+  renderTempList();
+
+  const box = document.getElementById('suggestionBox');
+  if(day.lastMessage){
+    box.style.display='block';
+    box.className = 'suggestion' + (free<0 ? ' warn':'');
+    box.textContent = day.lastMessage;
+  }else{
+    box.style.display='none';
+  }
+}
+
+function renderBar(items, available, free){
+  const bar = document.getElementById('bar');
+  const ticks = document.getElementById('ticks');
+  bar.innerHTML = '';
+  if(available<=0){
+    bar.innerHTML = '<div class="seg over" style="flex-basis:100%;">起床/入睡时间设置有误</div>';
+    ticks.innerHTML = '';
+    return;
+  }
+  const fixedTotal = items.reduce((s,i)=>s+i.minutes,0);
+  const denom = Math.max(available, fixedTotal);
+  items.forEach(it=>{
+    if(it.minutes<=0) return;
+    const pct = (it.minutes/denom)*100;
+    const seg = document.createElement('div');
+    seg.className = 'seg' + (fixedTotal>available?' over':'');
+    seg.style.flexBasis = pct+'%';
+    if(fixedTotal<=available) seg.style.background = colorVar(it.color);
+    seg.title = `${it.name} · ${minToHM(it.minutes)}`;
+    seg.textContent = pct>7 ? it.name.replace(/（.*?）/,'') : '';
+    bar.appendChild(seg);
+  });
+  if(fixedTotal<=available && free>0){
+    const seg = document.createElement('div');
+    seg.className = 'seg free';
+    seg.style.flexBasis = ((free/denom)*100)+'%';
+    seg.textContent = '弹性 '+minToHM(free);
+    bar.appendChild(seg);
+  }
+  const wake = timeToMin(document.getElementById('wakeInput').value) ?? timeToMin(general.wake);
+  ticks.innerHTML = `<span>${minToClock(wake)}</span><span>${minToClock(timeToMin(general.sleep))}</span>`;
+}
+
+function renderSummary(items, available, free){
+  const fixedTotal = items.reduce((s,i)=>s+i.minutes,0);
+  const totalTasks = items.length + day.temp.length;
+  const doneCount = items.filter(i=> day.checked[i.id]?.done).length + day.temp.filter(t=>t.done).length;
+  const pct = totalTasks ? Math.round(doneCount/totalTasks*100) : 0;
+  const stats = [
+    {label:'今日安排合计', value:minToHM(fixedTotal)},
+    {label:'可用清醒时间', value:minToHM(available)},
+    {label:'剩余弹性时间', value:minToHM(free), neg: free<0},
+    {label:'今日完成度', value:`${pct}%（${doneCount}/${totalTasks}）`},
+  ];
+  const el = document.getElementById('summary');
+  el.innerHTML = '';
+  stats.forEach(s=>{
+    const div = document.createElement('div');
+    div.className = 'stat'+(s.neg?' neg':'');
+    div.innerHTML = `<b>${s.value}</b><span>${s.label}</span>`;
+    el.appendChild(div);
+  });
+}
+
+function renderScheduleList(items){
+  const list = document.getElementById('scheduleList');
+  list.innerHTML='';
+  if(items.length===0){
+    list.innerHTML = '<div class="empty">今天的安排都被跳过了，去下面加一项，或者恢复某一项吧。</div>';
+  }
+  items.forEach(it=>{
+    const state = day.checked[it.id] || {done:false, actual:null};
+    const row = document.createElement('div');
+    row.className = 'task' + (state.done?' done':'');
+    const delBtn = it.kind==='extra'
+      ? `<button class="del" data-delextra="${it.id}" aria-label="删除这一项">✕</button>`
+      : `<button class="del" data-skip="${it.id}" aria-label="今天跳过这一项" title="今天跳过">✕</button>`;
+    row.innerHTML = `
+      <input type="checkbox" ${state.done?'checked':''} data-check="${it.id}">
+      <span class="swatch" style="background:${colorVar(it.color)}"></span>
+      <div class="t-name">${escapeHtml(it.name)}<small>计划 ${minToHM(it.minutes)}</small></div>
+      ${state.done ? `<input type="number" class="actual-in" data-actual="${it.id}" value="${state.actual ?? it.minutes}" min="0" step="5"> <span class="t-meta">实际分钟</span>` : ''}
+      ${delBtn}
+    `;
+    list.appendChild(row);
+  });
+  renderSkippedNote();
+}
+
+function renderSkippedNote(){
+  const el = document.getElementById('skippedNote');
+  if(!el) return;
+  if(!day.skipped || day.skipped.length===0){ el.style.display='none'; el.innerHTML=''; return; }
+  el.style.display='block';
+  el.innerHTML = '今天已跳过：' + day.skipped.map(id=>
+    `<button class="del" style="display:inline-block;background:var(--paper-alt);border:none;border-radius:10px;padding:3px 9px;margin:3px 4px 0 0;font-size:11px;" data-restore="${id}">↺ 恢复「${escapeHtml(idToLabel(id))}」</button>`
+  ).join('');
+}
+
+function renderTempList(){
+  const list = document.getElementById('tempList');
+  list.innerHTML='';
+  if(day.temp.length===0){ list.innerHTML = '<div class="empty">今天还没有临时任务，去「添加任务」标签加一个吧。</div>'; return; }
+  const sorted = [...day.temp].sort((a,b)=>{
+    const order = {high:0,mid:1,low:2};
+    return (order[a.priority]-order[b.priority]) || (a.deadline||'99:99').localeCompare(b.deadline||'99:99');
+  });
+  sorted.forEach(t=>{
+    const row = document.createElement('div');
+    row.className = 'task' + (t.done?' done':'');
+    row.innerHTML = `
+      <input type="checkbox" ${t.done?'checked':''} data-tcheck="${t.id}">
+      <span class="swatch" style="background:var(--temp)"></span>
+      <div class="t-name">${escapeHtml(t.name)}<small>计划 ${minToHM(t.minutes)}${t.deadline?(' · 截止 '+t.deadline):''}</small></div>
+      <span class="badge ${t.priority}">${PRIORITY_LABEL[t.priority]}</span>
+      ${t.done ? `<input type="number" class="actual-in" data-tactual="${t.id}" value="${t.actual ?? t.minutes}" min="0" step="5">` : ''}
+      <button class="del" data-deltemp="${t.id}" aria-label="删除">✕</button>
+    `;
+    list.appendChild(row);
+  });
+}
+
+function renderHabitEditor(){
+  const el = document.getElementById('habitEditor');
+  el.innerHTML='';
+  renderProtectedNote();
+  if(habits.length===0){
+    el.insertAdjacentHTML('beforeend', '<div class="empty">还没有固定习惯，在下方添加一个吧。</div>');
+  }
+  habits.forEach(h=>{
+    const row = document.createElement('div');
+    row.className='habit-row';
+    row.innerHTML = `
+      <div class="habit-name"><span class="swatch" style="background:${colorVar(h.color)}"></span>${escapeHtml(h.name)}${h.protected?'<small>（受保护，最后压缩）</small>':''}</div>
+      <div class="num-field"><label>正常</label><input type="number" min="0" step="5" data-htarget="${h.id}" value="${h.target}"></div>
+      <div class="num-field"><label>最低</label><input type="number" min="0" step="5" data-hmin="${h.id}" value="${h.min}"></div>
+      <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--ink-soft);">
+        <input type="checkbox" style="width:14px;height:14px;" ${h.protected?'checked':''} data-hprotected="${h.id}">受保护
+      </label>
+      <button class="del" data-delhabit="${h.id}" aria-label="删除这个习惯">✕</button>
+    `;
+    el.appendChild(row);
+  });
+  el.insertAdjacentHTML('beforeend', `
+    <div class="form-row" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);">
+      <div class="three" style="grid-template-columns:2fr 1fr 1fr;">
+        <input type="text" id="newHabitName" placeholder="新固定习惯，例如「练琴」">
+        <input type="number" id="newHabitTarget" placeholder="正常(分钟)" value="60" min="0" step="5">
+        <input type="number" id="newHabitMin" placeholder="最低(分钟)" value="30" min="0" step="5">
+      </div>
+      <div class="two">
+        <select id="newHabitColor">
+          <option value="a">配色 A</option><option value="b">配色 B</option><option value="c">配色 C</option>
+          <option value="d">配色 D</option><option value="e" selected>配色 E</option><option value="f">配色 F</option>
+        </select>
+        <button class="btn btn-primary" id="addHabitBtn">+ 添加固定习惯</button>
+      </div>
+    </div>
+  `);
+}
+
+function renderProtectedNote(){
+  const noteEl = document.getElementById('protectedNote');
+  if(!noteEl) return;
+  const protectedHabits = habits.filter(h=>h.protected);
+  if(protectedHabits.length===0){
+    noteEl.textContent = '当前没有设置受保护的习惯，重排时所有习惯都会按顺序被压缩。';
+  }else{
+    noteEl.textContent = `当前受保护：${protectedHabits.map(h=>h.name).join('、')}（永远最后被压缩）。`;
+  }
+}
+
+async function renderWeek(){
+  const el = document.getElementById('weekStats');
+  const noteEl = document.getElementById('weekNote');
+  el.innerHTML = '<div class="empty">加载中…</div>';
+  const days = [];
+  for(let i=0;i<7;i++){
+    const key = keyForOffset(i);
+    const d = await loadJSON('planner:day:'+key, null);
+    if(d) days.push(d);
+  }
+  if(days.length===0){ el.innerHTML = '<div class="empty">这周还没有记录，先在「今天」页面打卡吧。</div>'; noteEl.textContent=''; return; }
+
+  const totalsByHabit = {};
+  habits.forEach(h=> totalsByHabit[h.id] = {minutes:0, doneDays:0});
+  let totalTasks=0, doneTasks=0;
+  const skipCount = {};
+  habits.forEach(h=>skipCount[h.id]=0);
+
+  days.forEach(d=>{
+    habits.forEach(h=>{
+      totalTasks++;
+      const st = (d.checked||{})[h.id];
+      if(st && st.done){
+        doneTasks++;
+        totalsByHabit[h.id].minutes += Number(st.actual ?? 0);
+        totalsByHabit[h.id].doneDays++;
+      }else{
+        skipCount[h.id]++;
+      }
+    });
+    (d.temp||[]).forEach(t=>{ totalTasks++; if(t.done) doneTasks++; });
+  });
+
+  el.innerHTML = habits.map(h=>
+    `<div class="week-row"><span>${escapeHtml(h.name)}</span><b>${minToHM(totalsByHabit[h.id].minutes)} · ${totalsByHabit[h.id].doneDays}/${days.length}天</b></div>`
+  ).join('') + `<div class="week-row"><span>整体完成度</span><b>${totalTasks? Math.round(doneTasks/totalTasks*100):0}%</b></div>`;
+
+  let worst = null;
+  habits.forEach(h=>{ if(!worst || skipCount[h.id]>skipCount[worst]) worst = h.id; });
+  const worstDef = habits.find(h=>h.id===worst);
+  if(worstDef && skipCount[worst]>=2){
+    noteEl.textContent = `最近「${worstDef.name}」被跳过 ${skipCount[worst]} 次，是最常被推迟的项目，可以考虑降低它的正常目标时长，或换个时间段安排。`;
+  }else{
+    noteEl.textContent = habits.length ? '这周各项安排完成得比较均衡，继续保持。' : '还没有固定习惯，先去「固定习惯」标签添加吧。';
+  }
+}
+
+/* ---------- tab switching ---------- */
+document.getElementById('tabs').addEventListener('click', (e)=>{
+  const btn = e.target.closest('.tab-btn');
+  if(!btn) return;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b===btn));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+  if(btn.dataset.tab==='week') renderWeek();
+  if(btn.dataset.tab==='habits') renderHabitEditor();
+});
+
+/* ---------- events: today panel ---------- */
+document.getElementById('rescheduleBtn').addEventListener('click', async ()=>{
+  runReschedule();
+  await saveDay();
+  renderToday();
+});
+
+document.addEventListener('click', async (e)=>{
+  const t = e.target;
+  if(t.dataset.deltemp){
+    day.temp = day.temp.filter(x=>x.id!==t.dataset.deltemp);
+    await saveDay();
+    lastPlan=null; renderToday();
+  }
+  if(t.dataset.skip){
+    day.skipped = day.skipped || [];
+    if(!day.skipped.includes(t.dataset.skip)) day.skipped.push(t.dataset.skip);
+    delete day.checked[t.dataset.skip];
+    await saveDay();
+    lastPlan=null; renderToday();
+  }
+  if(t.dataset.restore){
+    day.skipped = (day.skipped||[]).filter(id=>id!==t.dataset.restore);
+    await saveDay();
+    lastPlan=null; renderToday();
+  }
+  if(t.dataset.delextra){
+    day.extra = (day.extra||[]).filter(x=>x.id!==t.dataset.delextra);
+    delete day.checked[t.dataset.delextra];
+    await saveDay();
+    lastPlan=null; renderToday();
+  }
+  if(t.dataset.delhabit){
+    habits = habits.filter(h=>h.id!==t.dataset.delhabit);
+    await saveHabits();
+    lastPlan=null; renderHabitEditor(); renderToday();
+  }
+  if(t.id==='addExtraBtn'){
+    const nameEl = document.getElementById('extraName');
+    const minEl = document.getElementById('extraMin');
+    const name = nameEl.value.trim();
+    if(!name) return;
+    day.extra = day.extra || [];
+    day.extra.push({id:uid(), name, minutes:Number(minEl.value)||20});
+    nameEl.value=''; minEl.value=20;
+    await saveDay();
+    lastPlan=null; renderToday();
+  }
+  if(t.id==='addHabitBtn'){
+    const nameEl = document.getElementById('newHabitName');
+    const targetEl = document.getElementById('newHabitTarget');
+    const minEl = document.getElementById('newHabitMin');
+    const colorEl = document.getElementById('newHabitColor');
+    const name = nameEl.value.trim();
+    if(!name) return;
+    habits.push({id:uid(), name, color:colorEl.value, protected:false, skippable:true, target:Number(targetEl.value)||30, min:Number(minEl.value)||15});
+    await saveHabits();
+    lastPlan=null; renderHabitEditor(); renderToday();
+  }
+});
+
+document.addEventListener('change', async (e)=>{
+  const t = e.target;
+
+  if(t.dataset.check){
+    const cur = day.checked[t.dataset.check] || {done:false, actual:null};
+    cur.done = t.checked;
+    const items = scheduleItemsFromPlan(currentPlan().plan);
+    const item = items.find(i=>i.id===t.dataset.check);
+    if(cur.done && cur.actual==null) cur.actual = item ? item.minutes : 0;
+    day.checked[t.dataset.check] = cur;
+    await saveDay(); renderToday();
+  }
+  if(t.dataset.actual){
+    const cur = day.checked[t.dataset.actual] || {done:true, actual:0};
+    cur.actual = Number(t.value)||0;
+    day.checked[t.dataset.actual] = cur;
+    await saveDay();
+  }
+  if(t.dataset.tcheck){
+    const task = day.temp.find(x=>x.id===t.dataset.tcheck);
+    if(task){
+      task.done = t.checked;
+      if(task.done && task.actual==null) task.actual = task.minutes;
+      await saveDay(); lastPlan=null; renderToday();
+    }
+  }
+  if(t.dataset.tactual){
+    const task = day.temp.find(x=>x.id===t.dataset.tactual);
+    if(task){ task.actual = Number(t.value)||0; await saveDay(); }
+  }
+  if(t.id==='wakeInput' || t.id==='modeInput' || t.id.startsWith('meal-')){
+    lastPlan=null; renderToday();
+  }
+});
+
+/* ---------- add task ---------- */
+document.getElementById('addTaskBtn').addEventListener('click', async ()=>{
+  const name = document.getElementById('taskName').value.trim();
+  if(!name) return;
+  const minutes = Number(document.getElementById('taskMin').value)||30;
+  const deadline = document.getElementById('taskDeadline').value || null;
+  const priority = document.getElementById('taskPriority').value;
+  day.temp.push({id:uid(), name, minutes, deadline, priority, done:false, actual:null});
+  document.getElementById('taskName').value='';
+  document.getElementById('taskMin').value=30;
+  document.getElementById('taskDeadline').value='';
+  await saveDay();
+  lastPlan=null;
+  // switch to today tab so the user sees it land in the schedule
+  document.querySelector('.tab-btn[data-tab="today"]').click();
+  renderToday();
+});
+
+/* ---------- habits editor ---------- */
+document.getElementById('habitEditor').addEventListener('change', async (e)=>{
+  const t = e.target;
+  if(t.dataset.htarget){ const h=habits.find(x=>x.id===t.dataset.htarget); if(h){ h.target=Number(t.value)||0; await saveHabits(); lastPlan=null; renderToday(); } }
+  if(t.dataset.hmin){ const h=habits.find(x=>x.id===t.dataset.hmin); if(h){ h.min=Number(t.value)||0; await saveHabits(); lastPlan=null; renderToday(); } }
+  if(t.dataset.hprotected){ const h=habits.find(x=>x.id===t.dataset.hprotected); if(h){ h.protected=t.checked; await saveHabits(); lastPlan=null; renderProtectedNote(); renderToday(); } }
+});
+
+/* ---------- settings ---------- */
+async function bindSetting(id, field, isNumber){
+  document.getElementById(id).addEventListener('change', async (e)=>{
+    general[field] = isNumber ? (Number(e.target.value)||0) : e.target.value;
+    await saveGeneral();
+    lastPlan=null;
+  });
+}
+bindSetting('defWake','wake',false);
+bindSetting('defSleep','sleep',false);
+bindSetting('wakeDyTarget','wakeDyTarget',true);
+bindSetting('wakeDyMin','wakeDyMin',true);
+bindSetting('cookMin','cookMin',true);
+bindSetting('deliveryMin','deliveryMin',true);
+document.getElementById('protectGame').addEventListener('change', async (e)=>{
+  general.protectGame = e.target.checked;
+  await saveGeneral();
+  lastPlan=null;
+});
+document.getElementById('deepseekKey').addEventListener('change', async (e)=>{
+  general.deepseekKey = e.target.value.trim();
+  await saveGeneral();
+});
+
+/* ---------- 问AI: turn free text into temp tasks via DeepSeek's OpenAI-compatible API ---------- */
+function habitNamesList(){ return habits.map(h=>h.name).join('、') || '（还没有设置固定习惯）'; }
+let aiExtracted = []; // last batch of tasks parsed from the AI, before being added to day.temp
+
+async function callAI(){
+  const input = document.getElementById('aiInput').value.trim();
+  const statusEl = document.getElementById('aiStatus');
+  const goBtn = document.getElementById('aiGoBtn');
+  statusEl.style.display='block';
+
+  if(!general.deepseekKey){
+    statusEl.textContent = '还没填API Key，先去「设置」里粘贴你自己的DeepSeek密钥。';
+    return;
+  }
+  if(!input){
+    statusEl.textContent = '先写几句今天要做的事吧。';
+    return;
+  }
+  statusEl.textContent = 'AI正在拆解…';
+  goBtn.disabled = true;
+
+  const sys = `你是一个日程助手。用户会用一段自然语言描述今天要做的临时事项。
+已知用户的固定习惯是：${habitNamesList()}，不需要把这些固定习惯也当成临时任务重复列出。
+请把用户的描述拆解成若干条临时任务，只返回一个JSON对象，不要有任何多余文字、不要用markdown代码块包裹，格式严格如下：
+{"summary":"一两句话的中文总结","tasks":[{"name":"任务名称","minutes":30,"deadline":"14:00或null","priority":"high或mid或low"}],"suggested_mode":"normal或busy或low或null"}
+minutes是你估计的合理耗时（分钟，整数）。deadline没提到就填null。priority根据紧急程度和语气判断。如果用户描述的事情很多很赶，suggested_mode填busy或low，否则填normal。`;
+
+  try{
+    const response = await fetch('https://api.deepseek.com/chat/completions', {
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization':'Bearer '+general.deepseekKey
+      },
+      body: JSON.stringify({
+        model:'deepseek-chat',
+        messages:[{role:'system', content: sys},{role:'user', content: input}],
+        stream:false
+      })
+    });
+    const data = await response.json();
+    if(data.error){ throw new Error(data.error.message || 'API错误'); }
+    const raw = data.choices?.[0]?.message?.content || '';
+    const cleaned = raw.replace(/```json|```/g,'').trim();
+    const parsed = JSON.parse(cleaned);
+    aiExtracted = (parsed.tasks||[]).map(t=>({
+      id:uid(),
+      name: t.name || '未命名任务',
+      minutes: Number(t.minutes)||30,
+      deadline: t.deadline && t.deadline!=='null' ? t.deadline : null,
+      priority: ['high','mid','low'].includes(t.priority) ? t.priority : 'mid',
+    }));
+    renderAIResult(parsed.summary || '', parsed.suggested_mode || null);
+    statusEl.style.display='none';
+  }catch(e){
+    statusEl.textContent = 'AI拆解失败了（'+e.message+'），检查一下API Key是否正确，或换个说法再试一次。';
+  }
+  goBtn.disabled = false;
+}
+
+function renderAIResult(summary, suggestedMode){
+  const card = document.getElementById('aiResultCard');
+  const summaryEl = document.getElementById('aiSummary');
+  const listEl = document.getElementById('aiTaskList');
+  card.style.display = aiExtracted.length ? 'block' : 'none';
+  if(summary){
+    summaryEl.style.display='block';
+    let text = summary;
+    if(suggestedMode && suggestedMode!=='normal'){
+      text += suggestedMode==='busy' ? '（今天看起来比较忙，建议切到「忙碌模式」）' : '（今天看起来比较紧张，建议切到「低能量模式」）';
+    }
+    summaryEl.textContent = text;
+  }else{
+    summaryEl.style.display='none';
+  }
+  listEl.innerHTML='';
+  if(aiExtracted.length===0){
+    listEl.innerHTML = '<div class="empty">没有识别出具体任务，可以换个说法再试试。</div>';
+    return;
+  }
+  aiExtracted.forEach(t=>{
+    const row = document.createElement('div');
+    row.className='task';
+    row.innerHTML = `
+      <span class="swatch" style="background:var(--temp)"></span>
+      <div class="t-name">${escapeHtml(t.name)}<small>${minToHM(t.minutes)}${t.deadline?(' · 截止 '+t.deadline):''}</small></div>
+      <span class="badge ${t.priority}">${PRIORITY_LABEL[t.priority]}</span>
+      <button class="btn btn-secondary" style="padding:6px 12px;" data-aiaddone="${t.id}">+ 加入</button>
+    `;
+    listEl.appendChild(row);
+  });
+}
+
+async function addAITask(id){
+  const t = aiExtracted.find(x=>x.id===id);
+  if(!t) return;
+  day.temp.push({id:uid(), name:t.name, minutes:t.minutes, deadline:t.deadline, priority:t.priority, done:false, actual:null});
+  await saveDay();
+  lastPlan=null;
+  aiExtracted = aiExtracted.filter(x=>x.id!==id);
+  renderAIResult(document.getElementById('aiSummary').textContent, null);
+}
+
+document.getElementById('aiGoBtn').addEventListener('click', callAI);
+document.getElementById('aiAddAllBtn').addEventListener('click', async ()=>{
+  for(const t of aiExtracted){
+    day.temp.push({id:uid(), name:t.name, minutes:t.minutes, deadline:t.deadline, priority:t.priority, done:false, actual:null});
+  }
+  aiExtracted = [];
+  await saveDay();
+  lastPlan=null;
+  document.getElementById('aiResultCard').style.display='none';
+  document.querySelector('.tab-btn[data-tab="today"]').click();
+  renderToday();
+});
+document.addEventListener('click', (e)=>{
+  if(e.target.dataset.aiaddone) addAITask(e.target.dataset.aiaddone);
+});
+
+/* ---------- init ---------- */
+(async function init(){
+  await loadAll();
+  runReschedule();
+  await saveDay();
+  renderToday();
+  renderHabitEditor();
+})();
+</script>
+</body>
+</html>
